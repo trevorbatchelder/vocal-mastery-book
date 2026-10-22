@@ -1,0 +1,46 @@
+{
+ "name": "The Guide to Vocal Mastery",
+ "short_name": "Vocal Mastery",
+ "id": ".",
+ "start_url": ".",
+ "lang": "en",
+ "description": "An interactive singing method \u2014 breath, pitch, tone, theory and harmony you can hear and practise.",
+ "display": "standalone",
+ "orientation": "any",
+ "categories": [
+  "education",
+  "music"
+ ],
+ "background_color": "#f6efe0",
+ "theme_color": "#f6efe0",
+ "icons": [
+  {
+   "src": "icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png"
+  },
+  {
+   "src": "icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png"
+  }
+ ],
+ "shortcuts": [
+  {
+   "name": "Learn",
+   "url": "./#learn"
+  },
+  {
+   "name": "Warm-ups",
+   "url": "./#warmups"
+  },
+  {
+   "name": "Pitch Lab",
+   "url": "./#pitch"
+  },
+  {
+   "name": "Harmony",
+   "url": "./#harmony"
+  }
+ ]
+}
