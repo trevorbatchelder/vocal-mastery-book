@@ -417,6 +417,15 @@ ol.steps li::marker{color:var(--plum);font-weight:900}
 .trylist{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:7px}
 .trylist li{font-size:14px;line-height:1.5;color:var(--ink2)}
 .trylist li::marker{color:var(--teal)}
+/* the live detector kits under the Mirror */
+.livekit{display:flex;flex-direction:column;gap:7px;border:1.5px solid var(--rule);border-radius:12px;padding:10px 14px;background:var(--panel)}
+.livekit>b{color:var(--ink);min-height:1.3em}
+.gmeter{position:relative;height:14px;border-radius:7px;background:linear-gradient(90deg,var(--sage) 0 30%,var(--gold) 30% 72%,var(--rust) 72% 100%);opacity:.92}
+.gmnd{position:absolute;top:-4px;left:5%;width:4px;height:22px;border-radius:2px;background:var(--ink);transition:left .15s linear}
+.gmlabels{display:flex;justify-content:space-between;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.holdbar{height:12px;border-radius:6px;border:1.5px solid var(--rule);overflow:hidden;background:var(--bg)}
+.holdfill{display:block;height:100%;width:0;background:var(--ok);transition:width .12s linear}
+.chip.on{background:var(--plum);color:#fff;border-color:var(--plum)}
 
 </style>
 
@@ -1599,9 +1608,10 @@ function hearExt(id) {           // one short demonstration per technique
     o.connect(g); g.connect(A.out); o.start(t0); lfo.start(t0); o.stop(t0 + 2.6); lfo.stop(t0 + 2.6); return; }
 }
 // ---- the Mirror: a live scrolling spectrogram with the harmonic ladder drawn on top
-let specStopFn = null, drawHarmBtns = null, specTarget = 0;
+// specHarmN: a target rung of the singer's OWN ladder (the dashed line rides their fundamental)
+let specStopFn = null, drawHarmBtns = null, specTarget = 0, specHarmN = 0;
 function stopSpec() { if (specStopFn) { specStopFn(); specStopFn = null; } }
-async function startSpec(cv, ov, readout) {
+async function startSpec(cv, ov, readout, probe) {
   stopSpec();
   try {
     const stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: false, noiseSuppression: false, autoGainControl: false}});
@@ -1617,9 +1627,12 @@ async function startSpec(cv, ov, readout) {
     const dx = Math.max(1, Math.round(1.7 * r)); let raf = 0, hold = [];
     const loop = () => {
       an.getByteFrequencyData(fd); an.getFloatTimeDomainData(td);
-      const f0 = autoCorrelate(td, ctx.sampleRate), ok = f0 > 55 && f0 < 1400;
+      const f0 = autoCorrelate(td, ctx.sampleRate), ok = f0 > 28 && f0 < 1400;   // down to 28 Hz so fry is audible to it
       hold.push(ok ? f0 : null); if (hold.length > 4) hold.shift();
       const fm = hold.filter(Boolean); const f = fm.length >= 3 ? fm.sort((a, b) => a - b)[fm.length >> 1] : null;
+      let rms = 0; for (let i = 0; i < td.length; i += 4) rms += td[i] * td[i]; rms = Math.sqrt(rms / (td.length / 4));
+      const binOf = fq => Math.min(NB - 1, Math.max(0, Math.round(fq / (ctx.sampleRate / 2) * NB)));
+      const energyAt = fq => { const b = binOf(fq); return Math.max(fd[b - 1] || 0, fd[b], fd[b + 1] || 0); };
       g.drawImage(cv, -dx, 0); g.fillStyle = css('--panel'); g.fillRect(W - dx, 0, dx, H);
       const c1 = css('--gold'), c2 = css('--rust'), c3 = css('--ink2');
       for (let y = 0; y < H; y++) {
@@ -1632,6 +1645,8 @@ async function startSpec(cv, ov, readout) {
       if (f) { og.fillStyle = css('--gold'); og.strokeStyle = css('--gold');
         for (let n = 1; n <= 16; n++) { const y = yOf(f * n); if (y < 6) break; og.globalAlpha = n === 1 ? 1 : .8; og.beginPath(); og.moveTo(W - 46 * r, y); og.lineTo(W - (n % 2 ? 26 : 32) * r, y); og.lineWidth = n === 1 ? 2.5 * r : 1.2 * r; og.stroke(); if (n === 1 || n % 2 === 0) og.fillText(String(n), W - 22 * r, y); } og.globalAlpha = 1; }
       if (specTarget && DRONE) { const y = yOf(DRONE.f * specTarget); og.strokeStyle = css('--ok'); og.lineWidth = 2 * r; og.setLineDash([6 * r, 5 * r]); og.beginPath(); og.moveTo(0, y); og.lineTo(W, y); og.stroke(); og.setLineDash([]); }
+      if (specHarmN && f) { const y = yOf(f * specHarmN); if (y > 4) { og.strokeStyle = css('--ok'); og.lineWidth = 2 * r; og.setLineDash([3 * r, 4 * r]); og.beginPath(); og.moveTo(0, y); og.lineTo(W, y); og.stroke(); og.setLineDash([]); og.fillStyle = css('--ok'); og.fillText('aim here · ' + specHarmN, 6 * r, y - 7 * r); } }
+      if (probe) probe(f, {rms, energyAt, binOf});
       if (readout) readout(f);
       raf = requestAnimationFrame(loop);
     };
@@ -1649,9 +1664,10 @@ PAGES.push({id: 'extended', no: 'V', name: 'The Extended Voice', blurb: 'grit & 
   const FAM = {grit: ['grit', 'Grit & Screams', 'var(--rust)'], overtone: ['overtone', 'Throat Singing', 'var(--plum)'], call: ['call', 'Calls & Leaps', 'var(--teal)']};
   v.append(header('V', 'The Extended <em>Voice</em>', `the sounds past clean singing: ${tm('distortion', 'grit')}, ${tm('throat-singing', 'throat singing')}, and the voice at full reach`,
     'words can’t hold these sounds — so hear each one built, watch the Mirror, and match the picture', 'var(--plum)'));
-  v.append(h('div', {class: 'toolbar'}, seg('Room', [['mirror', 'The Mirror'], ['grit', 'Grit'], ['overtone', 'Overtone'], ['call', 'Calls']], st.mode, x => { stopSpec(); stopDrone(); st.mode = x; sv(); redraw(); })));
-  // ---- the Mirror lives in every room; in the technique rooms it sits under the lesson
-  const mkMirror = compact => {
+  v.append(h('div', {class: 'toolbar'}, seg('Room', [['mirror', 'The Mirror'], ['grit', 'Grit'], ['overtone', 'Overtone'], ['call', 'Calls']], st.mode, x => { stopSpec(); stopDrone(); specHarmN = 0; st.mode = x; sv(); redraw(); })));
+  // ---- the Mirror lives in every room; the technique rooms add a live detector kit under it
+  const markFirst = k => { const f = store.get('ext.firsts', {}); if (!f[k]) { f[k] = today(); store.set('ext.firsts', f); } };
+  const mkMirror = (compact, kit) => {
     const cv = h('canvas', {class: 'spec'}), ov = h('canvas', {class: 'specov'});
     const note = h('b', {style: 'font-family:var(--display);font-size:24px;min-width:2.6ch;text-align:center'}, '–');
     const stat = h('span', {class: 'muted', style: 'font-size:12.5px;font-weight:700'}, 'the Mirror is off');
@@ -1660,12 +1676,64 @@ PAGES.push({id: 'extended', no: 'V', name: 'The Extended Voice', blurb: 'grit & 
       btn.textContent = '…';
       const okd = await startSpec(cv, ov, (f, ended) => { if (ended) { note.textContent = '–'; stat.textContent = 'the Mirror is off'; return; }
         if (f) { const m = 69 + 12 * Math.log2(f / 440), n = Math.round(m), c = Math.round((m - n) * 100); note.textContent = midiName(n); stat.textContent = `${Math.round(f)} Hz · ${c > 0 ? '+' : ''}${c}¢ — the gold ticks are your ladder`; }
-        else { note.textContent = '–'; stat.textContent = 'sing — time scrolls left, pitch runs up, loud glows'; } });
+        else { note.textContent = '–'; stat.textContent = 'sing — time scrolls left, pitch runs up, loud glows'; } }, kit && kit.probe);
       btn.textContent = okd ? 'Stop' : 'No microphone';
     }}}, 'Start the Mirror');
     return h('div', {class: 'mirror' + (compact ? ' compact' : '')},
       h('div', {class: 'row', style: 'gap:10px;align-items:center'}, btn, note, stat),
+      kit ? kit.el : '',
       h('div', {class: 'specwrap'}, cv, ov));
+  };
+  // the grit meter: how much of the sound is rattle vs tone — and when the tone has drowned
+  const gritKit = () => {
+    const stateEl = h('b', {style: 'font-size:14px'}, 'start the Mirror, then sing');
+    const needle = h('i', {class: 'gmnd'});
+    const gauge = h('div', {class: 'gmeter'}, needle);
+    let inZone = 0, lastT = 0;
+    const probe = (f, u) => {
+      const t = performance.now(), dt = lastT ? Math.min(.1, (t - lastT) / 1000) : 0; lastT = t;
+      if (u.rms < .015) { stateEl.textContent = 'listening…'; return; }
+      if (!f) { if (u.rms > .05) { stateEl.textContent = 'all storm, no rungs — ease off and find the tone'; needle.style.left = '96%'; } return; }
+      if (f < 80) { const air = u.rms > .05; stateEl.textContent = air ? 'fry with air — the engine of the scream' : 'fry — there it is. now feed it air, slowly'; if (air) markFirst('fry'); needle.style.left = '6%'; return; }
+      let harm = 0, between = 0, k = 1;
+      for (; k <= 8 && f * k < 4000; k++) { harm += u.energyAt(f * k); between += u.energyAt(f * (k + .5)); }
+      const ratio = Math.min(1, between / Math.max(1, harm));
+      needle.style.left = (5 + ratio * 90) + '%';
+      if (ratio < .3) stateEl.textContent = 'clean tone — now invite the rattle';
+      else if (ratio < .72) { stateEl.textContent = 'grit riding on tone — that is the sound'; inZone += dt; if (inZone > 1.5) markFirst('grit'); }
+      else stateEl.textContent = 'mostly noise — the tone is drowning. back off';
+    };
+    const f1 = store.get('ext.firsts', {});
+    return {probe, el: h('div', {class: 'livekit'}, stateEl, gauge,
+      h('div', {class: 'gmlabels'}, h('span', {}, 'clean'), h('span', {}, 'grit on tone'), h('span', {}, 'shout — back off')),
+      (f1.fry || f1.grit) ? h('p', {class: 'muted', style: 'font-size:11.5px;margin:0'}, [f1.fry ? `first fry with air · ${f1.fry}` : null, f1.grit ? `first grit on tone · ${f1.grit}` : null].filter(Boolean).join('  ·  ')) : '')};
+  };
+  // the hold target: pick a rung of YOUR ladder, light it, keep it lit for three seconds
+  const overtoneKit = () => {
+    const stateEl = h('b', {style: 'font-size:14px'}, 'pick a rung, then sing your own steady drone');
+    const chips = h('div', {class: 'row', style: 'gap:6px;flex-wrap:wrap'});
+    const best = store.get('ext.holds', {});
+    const paint = () => { chips.innerHTML = ''; [4, 5, 6, 8, 9, 10, 12].forEach(n => chips.append(
+      h('button', {class: 'chip' + (specHarmN === n ? ' on' : ''), on: {click: () => { specHarmN = specHarmN === n ? 0 : n; held = 0; done = false; paint(); }}},
+        `rung ${n}` + (best[n] ? ` · ${best[n]}s` : '')))); };
+    paint();
+    const fill = h('i', {class: 'holdfill'}); const bar = h('div', {class: 'holdbar'}, fill);
+    let held = 0, lastT = 0, done = false;
+    const probe = (f, u) => {
+      const t = performance.now(), dt = lastT ? Math.min(.1, (t - lastT) / 1000) : 0; lastT = t;
+      if (!specHarmN) { stateEl.textContent = 'pick a rung, then sing your own steady drone'; fill.style.width = '0%'; return; }
+      if (!f || u.rms < .02) { stateEl.textContent = 'sing a steady drone…'; held = Math.max(0, held - dt * 2); fill.style.width = (held / 3 * 100) + '%'; return; }
+      const e = u.energyAt(f * specHarmN), nb = (u.energyAt(f * (specHarmN - .5)) + u.energyAt(f * (specHarmN + .5))) / 2;
+      const lit = e > 55 && e > nb * 1.7;
+      held = lit ? held + dt : Math.max(0, held - dt * 1.5);
+      fill.style.width = Math.min(100, held / 3 * 100) + '%';
+      if (held >= 3) { if (!done) { done = true; toast('Held. The whistle is yours.'); markFirst('rung' + specHarmN); }
+        best[specHarmN] = Math.max(best[specHarmN] || 0, Math.round(held)); store.set('ext.holds', best);
+        stateEl.textContent = `rung ${specHarmN} held — that is overtone singing`; }
+      else stateEl.textContent = lit ? `rung ${specHarmN} is lit — hold it` : `aim the glow at the dashed line — rung ${specHarmN}`;
+    };
+    return {probe, el: h('div', {class: 'livekit'}, stateEl, chips, bar,
+      h('p', {class: 'muted', style: 'font-size:11.5px;margin:0'}, 'wear headphones if the demo drone is playing — the Mirror should hear only you'))};
   };
   const techCard = e => {
     const fam = FAM[e.fam];
@@ -1725,8 +1793,9 @@ PAGES.push({id: 'extended', no: 'V', name: 'The Extended Voice', blurb: 'grit & 
       h('button', {class: 'btn small', on: {click: () => { const s = state('warm', {}); s.mode = 'ex'; s.ex = 'fry'; keep('warm', s); page(PAGES.findIndex(p => p.id === 'warmups')); }}}, 'Warm up first → the Distortion set'),
       h('button', {class: 'btn small', on: {click: () => conceptGoto(['lesson', 'scream', '']) }}, 'The lesson: Grit & Screaming Safely'),
       h('button', {class: 'btn small', on: {click: () => { const s = state('warm', {}); s.mode = 'session'; s.plan = 'cool'; keep('warm', s); page(PAGES.findIndex(p => p.id === 'warmups')); }}}, 'Cool down after')));
+    const kit = st.mode === 'grit' ? gritKit() : st.mode === 'overtone' ? overtoneKit() : null;
     body.append(h('div', {class: 'body', style: 'grid-template-columns:minmax(185px,.27fr) minmax(0,1fr);align-items:start'},
-      nav, h('div', {style: 'display:flex;flex-direction:column;gap:14px;min-width:0'}, techCard(e), ...extras, mkMirror(true))));
+      nav, h('div', {style: 'display:flex;flex-direction:column;gap:14px;min-width:0'}, techCard(e), ...extras, mkMirror(true, kit))));
   }
   v.append(body);
 }});
