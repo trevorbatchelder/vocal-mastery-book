@@ -4,15 +4,15 @@
  "id": ".",
  "start_url": ".",
  "lang": "en",
- "description": "An interactive singing method \u2014 breath, pitch, tone, theory and harmony you can hear and practise.",
+ "description": "A singing method that listens: a daily warm-up set in your own range, pitch and ear work, harmony to sing against, and songs moved into your keys.",
  "display": "standalone",
  "orientation": "any",
  "categories": [
   "education",
   "music"
  ],
- "background_color": "#f6efe0",
- "theme_color": "#f6efe0",
+ "background_color": "#fbe9e4",
+ "theme_color": "#fbe9e4",
  "icons": [
   {
    "src": "icon-192.png",
@@ -27,20 +27,20 @@
  ],
  "shortcuts": [
   {
-   "name": "Learn",
-   "url": "./#learn"
+   "name": "Today",
+   "url": "./#today"
   },
   {
-   "name": "Warm-ups",
-   "url": "./#warmups"
+   "name": "Warm Up",
+   "url": "./#warm"
   },
   {
-   "name": "Pitch Lab",
-   "url": "./#pitch"
+   "name": "Ear & Pitch",
+   "url": "./#ear"
   },
   {
-   "name": "Harmony",
-   "url": "./#harmony"
+   "name": "Sing Together",
+   "url": "./#together"
   }
  ]
 }
