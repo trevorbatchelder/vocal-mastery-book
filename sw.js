@@ -1,7 +1,7 @@
 // Offline after the first visit, but always prefer the freshest copy when online.
 // The cache name is versioned per build (build_book.py replaces the version), so every publish makes a
 // new worker that takes over immediately and drops the old cache — updates land on the next reload.
-const C = 'vocal-mastery-book-20261125130253';
+const C = 'vocal-mastery-book-20261125130316';
 const FILES = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-180.png', 'clips/chylandyk.mp3', 'clips/fry.mp3', 'clips/kargyraa.mp3', 'clips/kulning.mp3', 'clips/sygyt.mp3', 'clips/trill.mp3', 'clips/trillslow.mp3', 'clips/yodel.mp3'];
 
 self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(C).then(c => c.addAll(FILES))); });
