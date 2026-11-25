@@ -519,6 +519,8 @@ ol.steps li::marker{color:var(--plum);font-weight:900}
 .found-meter i{display:block;height:100%;background:var(--rust)}
 .gloss-row.unfound{opacity:.55;border-style:dashed}
 .gloss-row.unfound b{color:var(--mute)}
+.game-btn{all:unset;cursor:pointer;box-sizing:border-box;align-self:flex-start;display:grid;grid-template-columns:auto 1fr;column-gap:10px;align-items:center;border:1.5px solid var(--ink);border-radius:14px;padding:10px 14px;position:relative;isolation:isolate}
+.game-btn .game-ic{grid-row:1/3;font-size:26px} .game-btn b{font-size:15.5px;font-weight:900} .game-btn small{font-size:12px;color:var(--mute);font-weight:700}
 .modes{display:grid;grid-template-columns:auto auto;gap:6px}
 .modes button{all:unset;cursor:pointer;box-sizing:border-box;border-radius:10px;padding:7px 12px;background:var(--panel);display:flex;flex-direction:column;gap:2px;border:1.5px solid transparent}
 .modes button b{font-weight:800;font-size:13px}
@@ -794,7 +796,7 @@ const view = () => $('#pg');
 const setFocus = f => { focus = f; drawBar(); };
 function header(no, title, sub, key, acc) {
   const chapters = PAGES.filter(q => /^[IVXLC]+$/.test(q.no));          // numbered chapters only (not ◎ Learn / ✎ Sketch)
-  const p = PAGES.find(q => q.no === no), run = no && chapters.length ? `${no} of ${chapters[chapters.length - 1].no}` : '';
+  const p = PAGES.find(q => q.no === no), run = /^[IVXLC]+$/.test(no || '') && chapters.length ? `${no} of ${chapters[chapters.length - 1].no}` : '';
   return h('header', {class: 'hd2'},
     h('div', {class: 'hrow'}, no && no !== '✎' ? h('div', {class: 'no'}, no) : '', h('h1', {html: title}),
       run && no !== '✎' ? h('div', {class: 'run'}, h('b', {}, run)) : ''),
@@ -816,9 +818,9 @@ const keep = (k, v) => store.set('pg.' + k, v);
 function safeDraw(p, v) { try { p.draw(v); placeThumbs(v); } catch (err) { console.error('page draw failed', p && p.id, err);   // one bad page shouldn't break the book
   v.append(h('div', {style: 'padding:40px 8px;max-width:60ch'}, h('h2', {class: 'lede', style: 'font-weight:800;font-size:18px;color:var(--rust)'}, 'This page hit a snag.'),
     h('p', {class: 'lede'}, 'Swipe or use the arrows to move on — the rest of the book is fine.'))); } }
-function page(i, back = false) {
+function page(i, back = false, game = false) {
   Seq.stop(); if (tunerStop) tunerStop(); clearInterval(timer60);
-  if (bookMode() && (PAGES[(i + PAGES.length) % PAGES.length] || {}).id === 'learn') i += back ? -1 : 1;   // Book mode has no Learn chapter
+  if (!game && (PAGES[(i + PAGES.length) % PAGES.length] || {}).id === 'learn') i += back ? -1 : 1;   // the game is not a chapter: only its button on the cover opens it
   at = (i + PAGES.length) % PAGES.length; store.set('at', at); focus = null;
   const p = PAGES[at]; const v = view(); v.className = 'pg' + (back ? ' back' : ''); void v.offsetWidth; v.innerHTML = '';   // fit() manages the frame's 'scrollable' class
   document.documentElement.style.setProperty('--acc', p.acc || 'var(--rust)');
@@ -863,8 +865,8 @@ const M = Object.assign({bpm: 80, beats: 4, on: false}, store.get('metro', {}));
 let sessionStart = null, sessionAcc = store.get('session:' + today(), 0), clockTimer = null, timer60 = null;
 function setBpm(v) { M.bpm = Math.max(30, Math.min(240, v)); store.set('metro', {bpm: M.bpm, beats: M.beats}); Seq.stop(); drawBar(); }
 function drawBar() {
-  const bar = $('#pbar'); bar.innerHTML = ''; bar.classList.toggle('gamebar', (PAGES[at] || {}).id === 'learn' && !bookMode());
-  if (bar.classList.contains('gamebar')) return drawGameBar(bar);   // in Learn mode the Learn page's footer is the game's HUD
+  const bar = $('#pbar'); bar.innerHTML = ''; bar.classList.toggle('gamebar', (PAGES[at] || {}).id === 'learn');
+  if (bar.classList.contains('gamebar')) return drawGameBar(bar);   // the game's footer is its HUD
   const fband = $('#footband'); if (fband) fband.innerHTML = '';   // the footer band is retired everywhere
   const bpm = h('div', {class: 'bpm', 'aria-live': 'polite'}, String(M.bpm));
   const dots = h('div', {class: 'beats', 'aria-hidden': 'true'}); for (let i = 0; i < M.beats; i++) dots.append(h('i', {class: i === 0 ? 'one' : ''}));
@@ -930,7 +932,7 @@ function openConcept(id) {
     c.more ? h('p', {class: 'cpop-more', html: glossify(c.more, id)}) : '',
     (c.see && c.see.length) ? h('div', {class: 'cpop-see'}, h('span', {class: 'muted', style: 'font-size:12px;letter-spacing:.08em;text-transform:uppercase'}, 'See also'),
       h('div', {html: c.see.map(s => tm(s)).join(' ')})) : '',
-    g && !(bookMode() && g[0] === 'lesson') ? h('button', {class: 'btn acc small cpop-go', on: {click: () => { closeConcept(); conceptGoto(g); }}}, g[2] + ' →') : '');
+    g ? h('button', {class: 'btn acc small cpop-go', on: {click: () => { closeConcept(); conceptGoto(g); }}}, g[2] + ' →') : '');
   const wrap = h('div', {id: 'cpop', on: {click: closeConcept}}, card);
   wrap.addEventListener('keydown', e => { if (e.key !== 'Tab') return;   // keep Tab inside the dialog
     const f = [...wrap.querySelectorAll('button')].filter(el => !el.disabled && el.offsetParent !== null); if (!f.length) return;
@@ -1242,9 +1244,9 @@ function roadView(v) {
 }
 
 // the Learn page: the course road (with the Index still reachable until it moves to the cover)
-PAGES.push({id: 'learn', no: 'I', name: 'Learn', blurb: 'a path from first breath to harmony', acc: 'var(--navy)', draw(v) {
+PAGES.push({id: 'learn', no: '🎮', name: 'The Game', blurb: 'a path from first breath to harmony', acc: 'var(--navy)', draw(v) {
   pageScroll = false;
-  v.append(header('I', 'Learn', '', 'climb the path · clear a chapter to open the next', 'var(--navy)'));
+  v.append(header('🎮', 'The Game', '', 'climb the path · clear a chapter to open the next', 'var(--navy)'));
   v.append(h('div', {class: 'toolbar'},
     h('label', {class: 'pick'}, h('span', {}, 'Sound'), h('button', {class: 'btn' + (soundOn() ? ' acc' : ''), style: 'min-height:40px', on: {click: () => { store.set('course.sound', !soundOn()); redraw(); }}}, soundOn() ? 'On' : 'Off'))));
   const s = state('course', {open: -1, challenge: -1});
@@ -1260,13 +1262,13 @@ PAGES.push({id: 'learn', no: 'I', name: 'Learn', blurb: 'a path from first breat
    both loses the chapter. Each right answer fills the chapter meter; fill it and the chapter is cleared. Points (◆) come
    from right answers, streaks and cleared chapters, and buy items: Hint and Heal. Reference is free — an open-book chart
    for the question, drawn from the same data the pages use. Turquoise (✦) comes from the recall bonus, as before.
-   Also here: Learn mode vs Book mode, soft unlocks (Peek), the Index as a collection, and progress backup. */
+   Also here: soft unlocks (Peek; now always open, since the book is always open), the Index as a collection, and progress backup. */
 const HEARTS = 2;   // lose both and the chapter is lost
 const HINT_COST = 50, HEAL_COST = 150, PTS_RIGHT = 15, PTS_STREAK = 5, PTS_STREAK_MAX = 20, PTS_WIN = 60, PTS_FLAWLESS = 40, PTS_START = 100, PTS_TESTOUT = 150, PTS_BONUS = 25, PTS_READING = 60;
 const points = () => store.get('course.points', PTS_START);
 const addPoints = n => store.set('course.points', Math.max(0, points() + n));
 let GAME = null, GAME_GAIN = 0;
-const bookMode = () => store.get('mode', 'learn') === 'book';
+const bookMode = () => true;   // the book is always open: the game is played from the cover and seals nothing
 const setMode = m => { store.set('mode', m); redraw(); };
 
 // a module's test-out: one long battle over every topic in it; win it and the whole module is cleared
@@ -1285,7 +1287,7 @@ const PEEK = new Set();
 const lessonFor = key => LESSONS.find(l => chapKey(l) === UNLOCKS[key]);
 const isOpen = key => bookMode() || !UNLOCKS[key] || !!courseGot()[UNLOCKS[key]] || PEEK.has(key);
 const lockMark = key => isOpen(key) ? '' : '🔒 ';
-function goLesson(L) { const s = state('course', {}); s.open = LESSONS.indexOf(L); s.challenge = -1; keep('course', s); page(PAGES.findIndex(p => p.id === 'learn')); }
+function goLesson(L) { const s = state('course', {}); s.open = LESSONS.indexOf(L); s.challenge = -1; keep('course', s); page(PAGES.findIndex(p => p.id === 'learn'), false, true); }
 // call where a sealed room would draw: draws the seal and returns true (the caller stops there)
 function gate(v, key, label) {
   const L = lessonFor(key);
@@ -1853,8 +1855,8 @@ const CONCEPT_GOTO = {
   'staff': ['lesson', 'staff', 'Read the staff'], 'clef': ['lesson', 'staff', 'Read the staff'], 'time-signature': ['lesson', 'time', 'Learn time signatures'], 'tempo': ['lesson', 'pulse', 'Feel the beat'],
 };
 function conceptGoto(g) {
-  if (g[0] === 'lesson') { const s = state('course', {}); s.open = LESSONS.findIndex(l => l.topic === g[1]); keep('course', s); page(PAGES.findIndex(p => p.id === 'learn')); }
-  else page(PAGES.findIndex(p => p.id === g[1]));
+  if (g[0] === 'lesson') { const s = state('course', {}); s.open = LESSONS.findIndex(l => l.topic === g[1]); keep('course', s); page(PAGES.findIndex(p => p.id === 'learn'), false, true); }
+  else page(PAGES.findIndex(p => p.id === g[1]), false, true);
 }
 
 /* ================================================================ COVER: title, contents, and the reference shelf */
@@ -1862,7 +1864,7 @@ PAGES.push({id: 'cover', no: '', acc: 'var(--rust)', draw(v) {
   const st = state('cover', {ref: 'ranges', key: 0, scale: 0});
   const sv = () => keep('cover', st);
   v.append(h('div', {html: band()}));
-  const toc = h('div', {class: 'toc'}, PAGES.slice(1).map((p, i) => bookMode() && p.id === 'learn' ? '' : h('button', {on: {click: () => page(i + 1)}}, h('b', {style: `color:${p.acc}`}, p.no), h('span', {}, p.name, h('small', {}, p.blurb)))));
+  const toc = h('div', {class: 'toc'}, PAGES.slice(1).map((p, i) => p.id === 'learn' ? '' : h('button', {on: {click: () => page(i + 1)}}, h('b', {style: `color:${p.acc}`}, p.no), h('span', {}, p.name, h('small', {}, p.blurb)))));
   // the mark is the day/night switch — tap it to flip the theme
   const markBtn = h('button', {title: resolveTheme() === 'moon' ? 'Tap for day' : 'Tap for night', 'aria-label': 'Switch day or night', style: 'all:unset;cursor:pointer;width:84px;flex:none;display:block',
     html: MARK, on: {click: () => setTheme(resolveTheme() === 'moon' ? 'sun' : 'moon')}});
@@ -1870,7 +1872,7 @@ PAGES.push({id: 'cover', no: '', acc: 'var(--rust)', draw(v) {
     h('div', {class: 'brand-t brand-sm', style: 'font-family:var(--title);color:var(--rust);letter-spacing:.22em;font-size:19px;text-transform:uppercase'}, 'The Guide to'),
     h('div', {class: 'brand-t brand-big', style: 'font-family:var(--title);font-size:clamp(40px,5.2vw,60px);letter-spacing:.06em;line-height:.95;text-transform:uppercase'}, 'Vocal', h('br'), 'Mastery'));
   const brand = h('div', {style: 'display:flex;align-items:center;gap:16px 24px;justify-content:space-between;flex-wrap:wrap'},
-    h('div', {style: 'display:flex;align-items:center;gap:10px'}, markBtn, titleBlock), modeSwitch(), coverPipe());
+    h('div', {style: 'display:flex;align-items:center;gap:10px'}, markBtn, titleBlock), coverPipe());
   const refPick = pick('Reference', [['ranges', 'Voice types & your range'], ['solfege', 'Solfège & scales'], ['iv', 'Intervals'], ['cof', 'Circle of fifths'], ['key', 'Chords in a key'], ['harmony', 'Harmony parts'], ['vowels', 'The vowels']], st.ref, x => { st.ref = x; sv(); redraw(); });
   const refBody = h('div', {style: 'display:flex;flex-direction:column;gap:10px;min-width:0'});
   const tools = h('div', {class: 'toolbar'}, refPick);
@@ -1914,10 +1916,12 @@ PAGES.push({id: 'cover', no: '', acc: 'var(--rust)', draw(v) {
     D.vowels.forEach(w => t.append(h('tr', {}, h('td', {class: 'l', style: 'font-size:20px'}, `[${w.ipa}]`), h('td', {}, w.word), h('td', {style: 'color:var(--rust);font-weight:800'}, w.italian), h('td', {style: 'font-size:13.5px;color:var(--ink2)'}, w.tip))));
     refBody.append(sec2('The vowels', `the five pure Italian ${tm('vowel', 'vowels')} carry every note · English adds mixtures of them`, 'var(--teal)', t));
   }
-  const nxt = LESSONS.find(l => !courseGot()[chapKey(l)]);
-  const cont = h('button', {class: 'btn acc', style: 'min-height:46px;font-size:15.5px;font-weight:800;align-self:flex-start', on: {click: () => {
-    const s = state('course', {}); s.open = nxt ? LESSONS.indexOf(nxt) : -1; keep('course', s); page(PAGES.findIndex(p => p.id === 'learn')); }}},
-    nxt ? `► Continue learning · ${nxt.name}` : '★ Course complete · back to the road');
+  // the game: a side door from the cover, not a chapter. It opens on the path, and keeps its progress
+  const nxt = LESSONS.find(l => !courseGot()[chapKey(l)]), begun = LESSONS.some(l => courseGot()[chapKey(l)]);
+  const cont = h('button', {class: 'game-btn', on: {click: () => {
+    const s = state('course', {}); s.open = -1; s.challenge = -1; keep('course', s); page(PAGES.findIndex(p => p.id === 'learn'), false, true); }}},
+    h('span', {class: 'game-ic', 'aria-hidden': 'true'}, '🎮'), h('b', {}, 'Play the game'),
+    h('small', {}, !nxt ? 'course complete · every chapter cleared' : begun ? `your progress is saved · next: ${nxt.name}` : 'lessons as battles · learn the book by playing'));
   v.append(brand, h('div', {html: band()}),
     h('div', {class: 'body', style: 'grid-template-columns:minmax(0,.8fr) minmax(0,1.3fr);align-items:start'},
       h('div', {style: 'display:flex;flex-direction:column;gap:12px;min-width:0'}, cont, sec2('Contents', 'tap a chapter · swipe or use ‹ › to turn pages', 'var(--ink)', toc)),
@@ -1967,11 +1971,11 @@ function exercisePlayer(ex, start, climb, onStep) {
 // the same pass, looped for as long as a session step lasts (Seq.stop() ends it)
 function exerciseLoop(ex, start, climb, bpm, onStep) { const {ev, len} = exerciseEvents(ex, start, climb, 60 / bpm, onStep); Seq.run(ev, len, () => onStep(-1, null)); }
 
-PAGES.push({id: 'warmups', no: 'II', name: 'Warm-ups', blurb: 'vocalises that climb · guided timed sessions · breath work', acc: 'var(--rust)', draw(v) {
+PAGES.push({id: 'warmups', no: 'I', name: 'Warm-ups', blurb: 'vocalises that climb · guided timed sessions · breath work', acc: 'var(--rust)', draw(v) {
   pageScroll = true;
   const st = state('warm', {mode: 'ex', ex: 'trill5', start: 55, climb: 7, breath: 'hiss', plan: 'daily'});
   const sv = () => keep('warm', st);
-  v.append(header('II', 'Warm-<em>ups</em>', `ten minutes before any song · every ${tm('warm-up')} climbs by half steps and comes back down · a ${tm('cool-down')} after`, st.mode === 'session' ? 'pick a plan and press Start · the book sings each drill while the clock runs · it moves you on' : 'pick an exercise, a starting note and how far to climb · Practice this plays it · sing along', 'var(--rust)'));
+  v.append(header('I', 'Warm-<em>ups</em>', `ten minutes before any song · every ${tm('warm-up')} climbs by half steps and comes back down · a ${tm('cool-down')} after`, st.mode === 'session' ? 'pick a plan and press Start · the book sings each drill while the clock runs · it moves you on' : 'pick an exercise, a starting note and how far to climb · Practice this plays it · sing along', 'var(--rust)'));
   const tools = h('div', {class: 'toolbar'}, seg('Mode', [['ex', 'Exercises'], ['session', lockMark('warmups:session') + 'Guided session']], st.mode, x => { clearInterval(timer60); st.mode = x; sv(); redraw(); }),
     pick('Start on', Array.from({length: 25}, (_, i) => [43 + i, midiName(43 + i)]), st.start, x => { st.start = +x; sv(); redraw(); }),
     pick('Climb', [[3, '3 half steps'], [5, '5 half steps'], [7, '7 half steps'], [9, '9 half steps'], [12, 'an octave']], st.climb, x => { st.climb = +x; sv(); redraw(); }));
@@ -2066,13 +2070,13 @@ function sessionView(v, st, sv, tools) {
 }
 
 /* ================================================================ III PITCH LAB: the microphone as a teacher */
-PAGES.push({id: 'pitch', no: 'III', name: 'Pitch Lab', blurb: 'match a note · sing an interval · find your range', acc: 'var(--navy)', draw(v) {
+PAGES.push({id: 'pitch', no: 'II', name: 'Pitch Lab', blurb: 'match a note · sing an interval · find your range', acc: 'var(--navy)', draw(v) {
   pageScroll = true;
   const st = state('pitch', {mode: 'match', target: 60, iv: 7, dir: 1, root: 60});
   const sv = () => keep('pitch', st);
   const MODES = [['match', 'Match a note'], ['interval', lockMark('pitch:interval') + 'Sing an interval'], ['range', lockMark('pitch:range') + 'Find your range'], ['free', 'Free']];
   const target = () => st.mode === 'match' ? st.target : st.mode === 'interval' ? st.root + st.dir * st.iv : null;
-  v.append(header('III', 'Pitch <em>Lab</em>', `hear it inside, sing it, see how close you were · ${tm('pitch-matching')} is the root of every harmony`, 'uses the microphone · iPad may ask each time · headphones stop the speaker feeding back', 'var(--navy)'));
+  v.append(header('II', 'Pitch <em>Lab</em>', `hear it inside, sing it, see how close you were · ${tm('pitch-matching')} is the root of every harmony`, 'uses the microphone · iPad may ask each time · headphones stop the speaker feeding back', 'var(--navy)'));
   const bar = h('div', {class: 'toolbar'}, seg('Mode', MODES, st.mode, x => { st.mode = x; sv(); redraw(); }));
   if (st.mode === 'interval') bar.append(pick('Interval', D.intervals.slice(1).map(x => [x[0], `${x[1]} (${x[2]})`]), st.iv, x => { st.iv = +x; sv(); redraw(); }), seg('Direction', [[1, 'Up'], [-1, 'Down']], st.dir, x => { st.dir = +x; sv(); redraw(); }));
   v.append(bar);
@@ -2140,12 +2144,12 @@ PAGES.push({id: 'pitch', no: 'III', name: 'Pitch Lab', blurb: 'match a note · s
 }});
 
 /* ================================================================ IV HARMONY: where a second voice sits, and how to sing it */
-PAGES.push({id: 'harmony', no: 'IV', name: 'Harmony', blurb: 'where the second voice sits · sing against the book', acc: 'var(--sage)', draw(v) {
+PAGES.push({id: 'harmony', no: 'III', name: 'Harmony', blurb: 'where the second voice sits · sing against the book', acc: 'var(--sage)', draw(v) {
   pageScroll = true;
   const st = state('harm', {key: 0, variant: 0, voices: 'both', motion: 0});
   const sv = () => keep('harm', st);
   const K = KEYS[st.key], Hm = D.harmony[K];
-  v.append(header('IV', 'Har<em>mony</em>', `how a second voice finds its note — and why it is almost always a ${tm('third')}`, 'everything moves to any key · Practice this sings the two voices · mute one and sing it yourself', 'var(--sage)'));
+  v.append(header('III', 'Har<em>mony</em>', `how a second voice finds its note — and why it is almost always a ${tm('third')}`, 'everything moves to any key · Practice this sings the two voices · mute one and sing it yourself', 'var(--sage)'));
   const VO = [['both', 'Both voices'], ['mel', 'Melody only'], ['harm', 'Harmony only']];
   v.append(h('div', {class: 'toolbar'}, pick('Key', KEYS.map((k, i) => [i, k + ' major']), st.key, x => { st.key = +x; sv(); redraw(); }), seg('Hear', VO, st.voices, x => { st.voices = x; sv(); redraw(); })));
   // 1 — the harmonised scale
@@ -2339,12 +2343,12 @@ async function startSpec(cv, ov, readout, probe) {
   } catch (e) { return false; }
 }
 
-PAGES.push({id: 'extended', no: 'V', name: 'The Extended Voice', blurb: 'grit & screams · throat singing · calls — hear it, see it, try it', acc: 'var(--plum)', draw(v) {
+PAGES.push({id: 'extended', no: 'IV', name: 'The Extended Voice', blurb: 'grit & screams · throat singing · calls — hear it, see it, try it', acc: 'var(--plum)', draw(v) {
   pageScroll = true;
   const st = state('ext', {mode: 'mirror', tech: 'fry-scream', drone: 45, grit: .5});
   const sv = () => keep('ext', st);
   const FAM = {grit: ['grit', 'Grit & Screams', 'var(--rust)'], overtone: ['overtone', 'Throat Singing', 'var(--plum)'], call: ['call', 'Calls & Leaps', 'var(--teal)']};
-  v.append(header('V', 'The Extended <em>Voice</em>', `the sounds past clean singing: ${tm('distortion', 'grit')}, ${tm('throat-singing', 'throat singing')}, and the voice at full reach`,
+  v.append(header('IV', 'The Extended <em>Voice</em>', `the sounds past clean singing: ${tm('distortion', 'grit')}, ${tm('throat-singing', 'throat singing')}, and the voice at full reach`,
     'words can’t hold these sounds — so hear each one built, watch the Mirror, and match the picture', 'var(--plum)'));
   v.append(h('div', {class: 'toolbar'}, seg('Room', [['mirror', 'The Mirror'], ['grit', lockMark('extended:grit') + 'Grit'], ['overtone', lockMark('extended:overtone') + 'Overtone'], ['call', 'Calls']], st.mode, x => { stopSpec(); stopDrone(); specHarmN = 0; st.mode = x; sv(); redraw(); })));
   if (st.mode === 'grit' && gate(v, 'extended:grit', 'The Grit room')) return;
@@ -2815,9 +2819,9 @@ function cpListen() {
 
 function cpAll() { cpRenderSong(); cpRenderDial(); cpRenderNext(); cpRenderLower(); cpRenderLive(); }
 
-PAGES.push({id: 'sketch', no: 'VI', name: 'Song Sketchpad', blurb: 'sing a line · find its key and the chords under it · write the song', acc: 'var(--rust)', draw(v) {
+PAGES.push({id: 'sketch', no: 'V', name: 'Song Sketchpad', blurb: 'sing a line · find its key and the chords under it · write the song', acc: 'var(--rust)', draw(v) {
   const S = cpSong();
-  v.append(header('VI', 'Song <em>Sketchpad</em>', `the ${tm('key')} your song is in, and the chords under your melody`, 'tap a bar, then a chord on the wheel · or Listen and sing a line', 'var(--rust)'));
+  v.append(header('V', 'Song <em>Sketchpad</em>', `the ${tm('key')} your song is in, and the chords under your melody`, 'tap a bar, then a chord on the wheel · or Listen and sing a line', 'var(--rust)'));
   const name = h('input', {type: 'text', value: S.name, 'aria-label': 'song name', class: 'cp-name', on: {input: e => { S.name = e.target.value; cpSave(); }}});
   const keys = KeyFinder.KEYS;
   const keySel = h('select', {'aria-label': 'key', on: {change: e => { const [kk, m] = e.target.value.split(':'); cpSetKey(+kk, m === 'm', false); }}},
@@ -4325,9 +4329,9 @@ QBANK.lyrics = [
 ];
 
 /* ---------------------------------------------------------------- the Index */
-PAGES.push({id: 'index', no: 'VII', name: 'The Index', blurb: 'every term and idea in the book, organized', acc: 'var(--navy)', draw(v) {
+PAGES.push({id: 'index', no: 'VI', name: 'The Index', blurb: 'every term and idea in the book, organized', acc: 'var(--navy)', draw(v) {
   pageScroll = true;
-  v.append(header('VII', 'The <em>Index</em>', 'every term the book uses and the ideas behind each lesson', 'browse by topic, or A to Z · tap anything to open it', 'var(--navy)'));
+  v.append(header('VI', 'The <em>Index</em>', 'every term the book uses and the ideas behind each lesson', 'browse by topic, or A to Z · tap anything to open it', 'var(--navy)'));
   const st = state('indexpage', {sec: 'az'});
   const go = sec => { st.sec = sec; keep('indexpage', st); redraw(); };
   const navBtn = ([sec, label]) => h('button', {class: 'btn' + (st.sec === sec ? ' acc' : ''), style: 'justify-content:flex-start;text-align:left;min-height:42px', on: {click: () => go(sec)}}, label);
@@ -4465,8 +4469,8 @@ function materialize(v, back) {
   frame.addEventListener('touchend', end, {passive: true}); frame.addEventListener('touchcancel', end, {passive: true});
 })();
 
-// the book's reading order: the course up front, then the practice rooms, then the Index
-const PAGE_ORDER = ['cover', 'learn', 'warmups', 'pitch', 'harmony', 'extended', 'sketch', 'index'];
+// the book's reading order: the practice rooms, then the Index; the game sits outside it, opened from the cover
+const PAGE_ORDER = ['cover', 'warmups', 'pitch', 'harmony', 'extended', 'sketch', 'index', 'learn'];
 PAGES.sort((a, b) => PAGE_ORDER.indexOf(a.id) - PAGE_ORDER.indexOf(b.id));
 PAGES.forEach(p => p.blurb = p.blurb || '');
 const start = (location.hash || '').slice(1), si = PAGES.findIndex(p => p.id === start);
