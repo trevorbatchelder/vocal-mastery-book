@@ -3,7 +3,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Vocal Mastery">
-<meta name="theme-color" content="#fbe9e4">
+<meta name="theme-color" content="#fbf1e1">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
 <style>/* fonts inlined for offline use — regenerate via pwa/inline_fonts.py --fetch */
@@ -13,16 +13,16 @@
 </style>
 <style>
 /* ================================================================ Breath: the rebuilt book's look (look A in docs/superpowers/specs/2026-11-25-vocal-directions.html)
-   Dawn air by default, Dusk at night, the rose accent in both. The token names keep the old book's (--rust, --sage, --panel …)
+   Dawn air by default, Dusk at night, the gold accent in both (pink until 26 Nov; the token is still named --rose). The token names keep the old book's (--rust, --sage, --panel …)
    so the reused sketch.css, reading.js and qbank.js pick up the new colours without edits. Off notes are amber, never red. */
 :root{   /* Dawn */
-  --bg:#fbe9e4; --bg2:#e3e8f3; --grad:radial-gradient(120% 90% at 50% 0%,#fbe9e4 0%,#eef0f7 55%,#e3e8f3 100%);
+  --bg:#fbf1e1; --bg2:#e3e8f3; --grad:radial-gradient(120% 90% at 50% 0%,#fbf1e1 0%,#f0f0f3 55%,#e3e8f3 100%);
   --panel:rgba(255,255,255,.6); --panel2:#e9ecf6; --glass:rgba(255,255,255,.55);
   --ink:#2b2e4a; --ink2:#454a6b; --mute:#6b6f8c; --rule:rgba(43,46,74,.16);
-  --rose:#c95f78; --rust:var(--rose); --acc:var(--rose); --gold:#c8913a;
+  --rose:#a97b22; --rust:var(--rose); --acc:var(--rose); --gold:#8a5a8f;   /* --rose is the accent (gold); --gold is the highlight (plum) */
   --teal:#3f8a87; --sage:#5f9a7c; --plum:#8a5a8f; --navy:#45588a;
-  --ok:#5f9a7c; --warn:#d49a3a; --bad:#d49a3a;
-  --onacc:#ffffff; --dark:#2b2e4a; --ondark:#fbe9e4;
+  --ok:#5f9a7c; --warn:#d9772e; --bad:#d9772e;   /* amber leaning orange, so an off note never reads as the gold of your part */
+  --onacc:#2b2e4a; --dark:#2b2e4a; --ondark:#fbf1e1;
   --display:'Instrument Serif','Iowan Old Style',Georgia,serif;
   --body:'Outfit','Avenir Next','Segoe UI',system-ui,sans-serif;
   --toph:64px; --tabh:84px;
@@ -32,9 +32,9 @@
   --bg:#262446; --bg2:#3d2c48; --grad:radial-gradient(120% 90% at 50% 0%,#3d2c48 0%,#2e2a4c 50%,#1f1e3a 100%);
   --panel:rgba(255,255,255,.08); --panel2:rgba(255,255,255,.12); --glass:rgba(255,255,255,.07);
   --ink:#f1e9ef; --ink2:#d6cbdc; --mute:#a99db6; --rule:rgba(241,233,239,.16);
-  --gold:#e0ad5c; --teal:#72b8b3; --sage:#86c2a1; --plum:#c39ac8; --navy:#97a8d8;
-  --ok:#86c2a1; --warn:#e5b062; --bad:#e5b062;
-  --dark:#14132a; --ondark:#f1e9ef;
+  --rose:#e3b85c; --gold:#c39ac8; --teal:#72b8b3; --sage:#86c2a1; --plum:#c39ac8; --navy:#97a8d8;
+  --ok:#86c2a1; --warn:#f0995a; --bad:#f0995a;
+  --onacc:#1f1e3a; --dark:#14132a; --ondark:#f1e9ef;
   color-scheme:dark;
 }
 @media (max-width:700px){ :root{ --tabh:64px; } }
@@ -684,7 +684,7 @@ function theme(t) {
   if (t !== 'dawn' && t !== 'dusk') t = 'dawn';
   document.documentElement.dataset.theme = t; store.set('theme', t);
   const b = $('#themebtn'); if (b) b.innerHTML = t === 'dusk' ? ICON.sun : ICON.moon;
-  const m = $('meta[name="theme-color"]'); if (m) m.setAttribute('content', t === 'dusk' ? '#262446' : '#fbe9e4');
+  const m = $('meta[name="theme-color"]'); if (m) m.setAttribute('content', t === 'dusk' ? '#262446' : '#fbf1e1');
   return t;
 }
 const svgI = (body, fill) => `<svg width="22" height="22" viewBox="0 0 24 24" fill="${fill ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
@@ -1412,7 +1412,7 @@ function lane(host, {lo = 48, hi = 72, brk = null, seconds = 6} = {}) {
     if (dead) return;
     g.setTransform(r, 0, 0, r, 0, 0); g.clearRect(0, 0, W, H);
     const tn = now(), nowX = KW + (W - KW) * PAST, pps = (W - KW) / seconds, x = t => nowX - (tn - t) * pps, rh = rowH();
-    const rose = cssv('--rose', '#c95f78'), ink = cssv('--ink', '#2b2e4a'), rule = cssv('--rule', 'rgba(0,0,0,.15)'), mute = cssv('--mute', '#888');
+    const rose = cssv('--rose', '#a97b22'), ink = cssv('--ink', '#2b2e4a'), rule = cssv('--rule', 'rgba(0,0,0,.15)'), mute = cssv('--mute', '#888');
     // the break, a soft band across the whole lane
     if (brk) { g.fillStyle = rose; g.globalAlpha = .1; g.fillRect(KW, y(brk[1]) - rh / 2, W - KW, y(brk[0]) - y(brk[1]) + rh); g.globalAlpha = 1; }
     // a faint line on every C and on every note of the keyboard
@@ -1888,7 +1888,7 @@ function mirror(host) {
   cv.width = ov.width = W; cv.height = ov.height = H;
   const g = cv.getContext('2d'), og = ov.getContext('2d');
   const fmin = 55, fmax = 4200, yOf = f => H - Math.log(f / fmin) / Math.log(fmax / fmin) * H;
-  let pal = {}, k = 0; const tokens = () => { pal = {panel: cssv('--panel', '#fff'), hi: cssv('--gold', '#c9a24a'), mid: cssv('--rose', '#c95f78'), lo: cssv('--ink2', '#555'), rule: cssv('--rule', '#ccc'), mute: cssv('--mute', '#888')}; };
+  let pal = {}, k = 0; const tokens = () => { pal = {panel: cssv('--panel', '#fff'), hi: cssv('--gold', '#c9a24a'), mid: cssv('--rose', '#a97b22'), lo: cssv('--ink2', '#555'), rule: cssv('--rule', '#ccc'), mute: cssv('--mute', '#888')}; };
   tokens(); g.fillStyle = pal.panel; g.fillRect(0, 0, W, H);
   const dx = Math.max(1, Math.round(1.7 * r)); let raf = 0, f0 = null;
   const unsub = Mic.onFrame(fr => { f0 = fr.f; });
