@@ -364,7 +364,7 @@ body.hf-on #tabs,body.hf-on #dock{display:none}
 .ladder5 b{font-weight:600}
 .ladder5 span{font-size:13px;color:var(--ink2)}
 .today-range p{margin:6px 0 10px;font-size:14px;color:var(--ink2)}
-.tr-col{height:220px;display:flex;justify-content:center}
+.tr-col{height:260px;display:flex;justify-content:center}
 .tr-col svg{height:100%;width:auto}
 .today-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));gap:12px}
 .today-card{text-align:left;color:var(--ink);display:flex;flex-direction:column;gap:6px}
@@ -480,7 +480,7 @@ body.hf-on #tabs,body.hf-on #dock{display:none}
 .sk-keys{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin:4px 0 6px}
 .sk-keys button{min-height:44px;border-radius:10px;border:1.5px solid var(--rule);background:transparent;color:var(--mute);font-family:var(--display);font-size:20px}
 .sk-keys button[data-fit="fits"]{border-color:var(--sage);color:var(--ink);background:color-mix(in srgb,var(--sage) 14%,transparent)}
-.sk-keys button[data-fit="tight"]{border-color:var(--warn);color:var(--ink)}
+.sk-keys button[data-fit="tight"]{border-color:var(--warn);border-style:dashed;color:var(--ink)}
 .sk-keys button[aria-pressed="true"]{box-shadow:inset 0 0 0 2px var(--ink)}
 .sk-listcard .row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 #sk-title{flex:1 1 160px;min-width:0;min-height:44px;border:1px solid var(--rule);border-radius:10px;background:transparent;color:var(--ink);padding:0 12px;font:inherit}
@@ -1107,7 +1107,7 @@ function harmonize(piece, kind = 'auto') {
 // the key for two singers: each part (semitones above the tonic, rests dropped) against its own singer's range (null: the middle range).
 // First a key where both fit in the same octave; failing that, each part may move by whole octaves into its own range (a man
 // singing the third above an octave down). The key whose tighter singer has the most room wins. -> {key, shifts: [s0, s1]}
-function fitKey2(piece, kind, parts, keys = D.keys) {
+function fitKey2(piece, kind, parts, keys = keyNames(piece.mode)) {
   const SH = [-24, -12, 0, 12];
   const rs = parts.map(p => p.range || MID_RANGE);
   // a part wider than its singer's range can never fit; it counts only by how far it is from centred, so it cannot outvote a part that can
@@ -1175,15 +1175,6 @@ function capoFor(key, mode = 'major') {
   return (D.capoShapes[mode] || D.capoShapes.major).map(shape => ({capo: (pcof(key) - pcof(mode === 'minor' ? shape.slice(0, -1) : shape) + 12) % 12, shape}))
     .filter(x => x.capo <= 7).sort((a, b) => a.capo - b.capo).slice(0, 2);
 }
-// which end runs past, for the first singer whose part does not fit: 'low', 'high', 'both' or null
-function pastWhich(choice, ranges) {
-  for (let i = 0; i < ranges.length; i++) {
-    const r = ranges[i] || keysMid(), d = choice.lo - (choice.shifts[0] - choice.shifts[i]), u = choice.hi - (choice.shifts[0] - choice.shifts[i]);
-    const low = d < r[0], high = u > r[1];
-    if (low || high) return low && high ? 'both' : low ? 'low' : 'high';
-  }
-  return null;
-}
 
 /* ---- duet.js ---- */
 /* ================================================================ duet: drawing a piece for one or two singers
@@ -1191,7 +1182,7 @@ function pastWhich(choice, ranges) {
    notes, the note sounding lit for both, the next phrase faint below. Readable at arm's length (dots 24 px, words 20 px). */
 
 // a degree's letter name in a piece's key (a minor key reads its relative major's letters)
-const relMajor = key => D.keys.find(k => pcof(k) === (pcof(key) + 3) % 12);
+const relMajor = key => (D.cof.find(r => pcof(r[2].slice(0, -1)) === pcof(key)) || [key])[0];   // the circle's pairs: D♯ minor reads F♯ major
 function degName(key, mode, deg, alter = 0) {
   const d = ((deg % 7) + 7) % 7, n = mode === 'minor' ? D.keyScales[relMajor(key)][(d + 5) % 7] : D.keyScales[key][d];
   if (!alter) return n;
@@ -1373,9 +1364,9 @@ const Mic = { state: 'off', get ok() { return this.state === 'on'; }, _subs: [],
 
 // what to say when the microphone will not open: one plain sentence per reason
 const MIC_MSG = {
-  denied: 'The microphone is blocked. Allow it in Settings, Safari, Microphone (or the browser’s site settings), then press Listen again.',
+  denied: 'The microphone is blocked. Allow it in Settings, Safari, Microphone (or the browser’s site settings), then try again.',
   insecure: 'The microphone only works when the book is opened from https:// or as the installed app.',
-  nomic: 'No microphone found. Connect one and press Listen again.',
+  nomic: 'No microphone found. Connect one and try again.',
   error: 'The microphone could not start. Close other apps using it and try again.',
 };
 const micMessage = state => MIC_MSG[state] || MIC_MSG.error;
@@ -1475,11 +1466,11 @@ function rangeColumn({range = null, brk = null, zone = null, lo = 36, hi = 84} =
     + `${R ? ` data-range="${R[0]}-${R[1]}"` : ''}${B ? ` data-break="${B[0]}-${B[1]}"` : ''} preserveAspectRatio="xMidYMid meet">`];
   for (let m = lo; m <= hi; m++) { const blk = [1, 3, 6, 8, 10].includes(m % 12);
     o.push(`<rect x="${blk ? 40 : 28}" y="${yTop(m) + .5}" width="${blk ? 44 : 64}" height="${RH - 1}" rx="2" fill="${blk ? 'var(--ink)' : '#ffffff'}" opacity="${blk ? .85 : .95}"${blk ? '' : ' stroke="var(--rule)" stroke-width=".6"'}/>`);
-    if (m % 12 === 0) o.push(`<text x="24" y="${yTop(m) + RH / 2 + 3}" font-size="8" text-anchor="end" fill="var(--mute)">${midiName(m)}</text>`); }
+    if (m % 12 === 0) o.push(`<text x="24" y="${yTop(m) + RH / 2 + 3}" font-size="11" text-anchor="end" fill="var(--mute)">${midiName(m)}</text>`); }
   if (Z) o.push(`<rect x="26" y="${yTop(Z[1])}" width="68" height="${(Z[1] - Z[0] + 1) * RH}" rx="5" fill="var(--teal)" opacity=".16"/>`);
   if (R) o.push(`<rect x="26" y="${yTop(R[1])}" width="68" height="${(R[1] - R[0] + 1) * RH}" rx="6" fill="var(--rose)" opacity=".22"/>`);
   if (B) [B[1], B[0] - 1].forEach(m => o.push(`<line x1="24" x2="96" y1="${yTop(m) + (m === B[1] ? 0 : RH)}" y2="${yTop(m) + (m === B[1] ? 0 : RH)}" stroke="var(--rose)" stroke-width="1.4" stroke-dasharray="4 3"/>`));
-  if (B) o.push(`<text x="96" y="${yTop(B[1]) - 2}" font-size="7" text-anchor="end" fill="var(--rose)">break</text>`);
+  if (B) o.push(`<text x="96" y="${yTop(B[1]) - 2}" font-size="10" text-anchor="end" fill="var(--rose)">break</text>`);
   return o.join('') + '</svg>';
 }
 
@@ -2201,9 +2192,10 @@ function drawMirror(v) {
    book's suggestion bar by bar unless you chose one. songPiece() turns a song into a piece like the shelf's, for the duet and the writer. */
 
 const MySongs = (() => {
-  const db = () => new Promise((res, rej) => { try { const r = indexedDB.open('vm2-songs', 1);
+  let dbp = null;                                   // one connection for the session; a failure lets the next call try again
+  const db = () => dbp || (dbp = new Promise((res, rej) => { try { const r = indexedDB.open('vm2-songs', 1);
     r.onupgradeneeded = () => r.result.createObjectStore('songs', {keyPath: 'id'});
-    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch (e) { rej(e); } });
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch (e) { rej(e); } }).catch(e => { dbp = null; throw e; }));
   const tx = async (mode, fn) => { const d = await db(); return new Promise((res, rej) => { const t = d.transaction('songs', mode), out = fn(t.objectStore('songs'));
     t.oncomplete = () => res(out && 'result' in out ? out.result : undefined); t.onerror = () => rej(t.error); }); };
   return {
@@ -2216,7 +2208,8 @@ const MySongs = (() => {
 // the shelf's copy, so drawing a page never waits on the database
 let mySongs = [], mySongsLoaded = false;
 MySongs.list().then(list => { mySongs = list; mySongsLoaded = true; if (typeof current !== 'undefined' && (current === 'together' || current === 'songs')) redraw(); });
-const keepMySong = s => { const i = mySongs.findIndex(x => x.id === s.id); if (i < 0) mySongs.push(s); else mySongs[i] = s; return MySongs.save(s); };
+const keepMySong = s => { const i = mySongs.findIndex(x => x.id === s.id); if (i < 0) mySongs.push(s); else mySongs[i] = s;
+  return MySongs.save(s).then(ok => { if (!ok) toast('Your song could not be saved on this device. It stays open until you leave.'); return ok; }); };
 
 const newId = p => p + Math.random().toString(36).slice(2, 9);
 const newSong = () => ({id: newId('mine-'), kind: 'mine', title: 'My song', key: 'C', mode: 'major', meter: [4, 4], bpm: 84,
@@ -2492,8 +2485,8 @@ function fitShift(semis, key, range) {
     return {key, shift, room: Math.min(Math.min(...ms) - lo, hi - Math.max(...ms))}; }).reduce((a, b) => b.room > a.room ? b : a);
 }
 // the key (and octave) with the most room at the tighter end; ties go to the earlier key
-function fitKey(semis, range) {
-  const best = D.keys.map(k => fitShift(semis, k, range)).reduce((a, b) => b.room > a.room ? b : a);
+function fitKey(semis, range, mode = 'major') {
+  const best = keyNames(mode).map(k => fitShift(semis, k, range)).reduce((a, b) => b.room > a.room ? b : a);
   return {key: best.key, shift: best.shift};
 }
 // one part of a piece as semitones above the tonic, rests dropped: 'mel' or 'harm' (the harmony writer's, of this kind)
@@ -2519,7 +2512,7 @@ page('together', {name: 'Sing Together', short: 'Together', icon: 'together', dr
     return; }
   if (st.mode === 'duet') return drawDuet(v, st, piece, set);
   const mySemis = partSemis(piece, st.kind, st.you);
-  const fit = fitKey(mySemis, R), key = D.keys.includes(st.key) ? st.key : fit.key;
+  const fit = fitKey(mySemis, R, mode), key = keyNames(mode).includes(st.key) ? st.key : fit.key;
   const shift = key === fit.key ? fit.shift : fitShift(mySemis, key, R).shift;   // a key you chose still gets the octave that fits
   const P = partsOf(piece, st.kind, key, shift), mine = st.you === 'mel' ? P.mel : P.harm, other = st.you === 'mel' ? P.harm : P.mel;
   const kindName = TG_KINDS.find(k => k[0] === st.kind)[1].toLowerCase();
@@ -2534,7 +2527,7 @@ page('together', {name: 'Sing Together', short: 'Together', icon: 'together', dr
       seg('Harmony', TG_KINDS, st.kind, x => set('kind', x)),
       seg('You sing', [['harm', 'The harmony'], ['mel', 'The melody']], st.you, x => set('you', x)),
       seg('Hear', [['both', 'Both parts'], ['mine', 'Your part'], ['other', 'The other part']], st.hear, x => set('hear', x)),
-      pick('Key', [['auto', R ? `Fits your range (${fit.key})` : `Fits a middle range (${fit.key})`], ...D.keys.map(k => [k, `${k} ${mode}`])], D.keys.includes(st.key) ? st.key : 'auto', x => set('key', x))));
+      pick('Key', [['auto', R ? `Fits your range (${fit.key})` : `Fits a middle range (${fit.key})`], ...keyNames(mode).map(k => [k, `${k} ${mode}`])], keyNames(mode).includes(st.key) ? st.key : 'auto', x => set('key', x))));
   v.append(tgMine(piece)); { const vs = tgVerse(piece, st, set); if (vs) v.append(vs); }
 
   // the lane, sized to both parts, and the mic
@@ -2602,7 +2595,7 @@ function drawDuet(v, st, piece, set) {
   const A = {...S[0], col: 'var(--rose)'}, B = {...(S[1] || {id: null, name: 'Second voice', range: null}), col: 'var(--teal)'};
   const melS = st.swap ? B : A, harmS = st.swap ? A : B;          // who sings the melody, who the harmony
   const parts = [{steps: partSemis(piece, st.kind, 'mel'), range: melS.range}, {steps: partSemis(piece, st.kind, 'harm'), range: harmS.range}];
-  const fit = fitKey2(piece, st.kind, parts), key = D.keys.includes(st.key) ? st.key : fit.key;
+  const fit = fitKey2(piece, st.kind, parts), key = keyNames(mode).includes(st.key) ? st.key : fit.key;
   const shifts = key === fit.key ? fit.shifts : fitKey2(piece, st.kind, parts, [key]).shifts;
   const mel = partsOf(piece, st.kind, key, shifts[0]), harm = partsOf(piece, st.kind, key, shifts[1]);
   const kindName = st.kind === 'auto' ? 'harmony' : TG_KINDS.find(k => k[0] === st.kind)[1].toLowerCase();
@@ -2614,7 +2607,7 @@ function drawDuet(v, st, piece, set) {
       pick('Sing', tgShelf(), piece.id, x => set('piece', x), 'tg-piece'),
       seg('Together', TG_MODES, 'duet', x => set('mode', x)),
       seg('Harmony', TG_KINDS, st.kind, x => set('kind', x)),
-      pick('Key', [['auto', `Fits both ranges (${fit.key})`], ...D.keys.map(x => [x, `${x} ${mode}`])], D.keys.includes(st.key) ? st.key : 'auto', x => set('key', x))));
+      pick('Key', [['auto', `Fits both ranges (${fit.key})`], ...keyNames(mode).map(x => [x, `${x} ${mode}`])], keyNames(mode).includes(st.key) ? st.key : 'auto', x => set('key', x))));
   v.append(tgMine(piece)); { const vs = tgVerse(piece, st, set); if (vs) v.append(vs); }
 
   // who sings what, and the key in words
@@ -2655,10 +2648,12 @@ function drawDuet(v, st, piece, set) {
 
   // full screen: the stage large, for a phone propped on a counter; the screen stays awake; a hidden page stops the book
   let full = null, wake = null, dfPlay = null;
-  const askWake = async () => { try { if (navigator.wakeLock && navigator.wakeLock.request) wake = await navigator.wakeLock.request('screen'); } catch (e) { wake = null; } };
+  const askWake = async () => { try { if (navigator.wakeLock && navigator.wakeLock.request) { const w = await navigator.wakeLock.request('screen'); if (full) wake = w; else w.release(); } } catch (e) { wake = null; } };   // closed before it came: let it go
   const releaseWake = () => { try { wake && wake.release && wake.release(); } catch (e) {} wake = null; };
   const playLabel = () => { if (dfPlay) dfPlay.textContent = dockPlaying ? 'Stop' : 'Play'; };
-  const moveTo = kk => { curK = Math.max(0, Math.min(nPh - 1, kk)); active.phrase(curK); st.phrase = curK; keep('together', st); };
+  // a new phrase while the book plays: it stops and starts again from there, so the lit note never drags you back
+  const moveTo = kk => { const was = dockPlaying; if (was) dockStop(); curK = Math.max(0, Math.min(nPh - 1, kk)); active.phrase(curK); st.phrase = curK; keep('together', st);
+    if (was) { const b = $('#dock .dock-play'); if (b) b.click(); setTimeout(playLabel, 0); } };
   function openFull() {
     if (full) return;
     const host = h('div', {class: 'duet-full-stage'});
@@ -2685,7 +2680,8 @@ function drawDuet(v, st, piece, set) {
   const M2 = metric(piece), ph = piece.phrases || [0];
   const lineOf = {s1: melS === A ? rows[0].midi : rows[1].midi, s2: melS === B ? rows[0].midi : rows[1].midi};
   const lines = play === 'both' ? [rows[0].midi, rows[1].midi] : play === 'chords' ? [] : [lineOf[play]];
-  const tonic = tonicMidi(key) + Math.min(...shifts) - 12;
+  let tonic = tonicMidi(key) + Math.min(...shifts) - 12; while (tonic < 45) tonic += 12;   // never below A2, where a chord turns to mud
+  window.__tgChordLow = tonic;
   const chordAt = pcs => { let prev = -1; return pcs.map(x => { let m = tonic + x; while (m <= prev) m += 12; prev = m; return m; }); };   // root position above the low tonic
   const playName = playOpts.find(o => o[0] === play)[1].toLowerCase();
   offer({label: `${piece.title} in ${key} ${mode} · ${playName}`, play: (bpm, onStop) => {
@@ -2698,7 +2694,7 @@ function drawDuet(v, st, piece, set) {
       for (let i = from; i < to; i++) { const at = t0 + (M2[i].start - base) * b, d = piece.notes[i][1] * b, idx = i, ch = M2[i].chord;
         const fresh = ch !== lastChord; lastChord = ch; if (fresh) chords++;
         ev.push({at, fn: t => { lines.forEach(l => { if (l[idx] != null) sing(l[idx], t, d * .97, {gain: .24}); }); if (fresh && ch.length) piano(chordAt(ch), t, play === 'chords' ? .22 : .1); },
-          ui: () => active.lit(idx)}); }
+          ui: () => { window.__tgLit = idx; active.lit(idx); }}); }
       const end = t0 + (M2[to - 1].start + piece.notes[to - 1][1] - base) * b;
       ev.push({at: end, ui: () => { active.lit(-1); if (st.loop && offered && offered.duet === runId) start(false); }});
       window.__tgFirst = count ? n - lead : null; window.__tgClicks = count ? n : 0; window.__tgChords = chords;
@@ -3090,9 +3086,9 @@ function cpListen() {
   eng.on('frame', v => { cpTakeTick(v); cpMeter(v); });
   eng.on('noteend', cpTakeAdd);
   eng.on('state', ({state}) => {
-    const msg = {denied: 'The microphone is blocked. Allow it in Settings → Safari → Microphone (or the browser\'s site settings), then press Listen again.',
+    const msg = {denied: 'The microphone is blocked. Allow it in Settings → Safari → Microphone (or the browser\'s site settings), then try again.',
       insecure: 'The microphone only works when the book is opened from https:// or as the installed app.',
-      nomic: 'No microphone found. Connect one and press Listen again.', error: 'The microphone could not start. Close other apps using it and try again.'}[state];
+      nomic: 'No microphone found. Connect one and try again.', error: 'The microphone could not start. Close other apps using it and try again.'}[state];
     if (msg) { cpMsg(msg); if (tunerStop === cpStopListen) tunerStop = null; }
     else if (state === 'listening') cpMsg('');
     cpRenderLive();
@@ -4104,8 +4100,8 @@ page('songs', {name: 'Songs & Keys', short: 'Songs', icon: 'songs', draw(v, arg)
   skId(views).id = 'sk-view';
   v.append(h('h1', {class: 'ph'}, 'Songs & Keys'), h('div', {class: 'toolbar'}, views));
   save();
-  if (st.view === 'sketch') return typeof drawSketch === 'function' ? drawSketch(v) : v.append(h('p', {class: 'lede'}, 'The Sketchpad opens here.'));
-  if (st.view === 'keys') return typeof drawKeysView === 'function' ? drawKeysView(v, st, save) : v.append(h('p', {class: 'lede'}, 'The keys open here.'));
+  if (st.view === 'sketch') return drawSketch(v);
+  if (st.view === 'keys') return drawKeysView(v, st, save);
   drawMove(v, st, save);
 }});
 
@@ -4173,7 +4169,7 @@ function drawAnswer(left, right, st, span, who, ranges, rangeOf, set) {
     res.append(h('p', {}, `${skSings(up)} it ${Math.abs(c.shifts[1] - c.shifts[0]) > 12 ? 'two octaves' : 'an octave'} higher.`)); }
   const noRange = who.filter((s, i) => !ranges[i]);
   if (noRange.length) res.append(h('p', {class: 'muted'}, who.length === 1 ? 'Using a middle range. Find yours in Ear & Pitch.'
-    : noRange.map(s => `${s.name} has no range yet, so a middle range stands in.`).join(' '), ' ', h('button', {class: 'linkbtn', on: {click: () => go('ear')}}, 'Find a range')));
+    : noRange.map(s => `${s.name} has no range yet, so a middle range stands in.`).join(' '), ' ', h('button', {class: 'linkbtn', on: {click: () => { setActiveSinger(noRange[0].id); go('ear'); }}}, 'Find a range')));
   const r0 = ranges[0] || keysMid(), lo = Math.max(36, Math.min(r0[0], ...ends.flat()) - 2), hi = Math.min(84, Math.max(r0[1], ...ends.flat()) + 2);
   res.append(keyboard(lo, hi, {lit: [...new Set(ends.flat())], you: ranges[0] || null, on: m => hearNote(m)}),
     h('div', {class: 'row'}, h('button', {class: 'btn', id: 'sk-hear', on: {click: () => hearPair(ends[0][0], ends[0][1])}}, 'Hear the lowest and highest')));
@@ -4184,7 +4180,7 @@ function drawAnswer(left, right, st, span, who, ranges, rangeOf, set) {
   right.append(h('div', {class: 'card'}, h('div', {class: 'k'}, 'Other keys, best first'),
     h('div', {class: 'sk-keys'}, choices.map(x => h('button', {'data-fit': x.fit, 'aria-pressed': x.key === c.key ? 'true' : 'false',
       'aria-label': `${x.key} ${span.mode}: ${x.fit === 'fits' ? 'fits' : x.fit === 'tight' ? 'a stretch' : 'out of range'}`, on: {click: () => { st.pick = x.key; keep('songs', st); go('songs', 'move'); }}}, x.key))),
-    h('p', {class: 'muted'}, 'Sage fits, amber is a stretch, faint runs out of range.')));
+    h('p', {class: 'muted'}, 'Solid sage fits, dashed amber is a stretch, faint runs out of range.')));
 }
 
 // your key list: the songs you have set, with the key they sit in for you
@@ -4221,7 +4217,7 @@ async function listenNote(btn, msg) {
       buf.push({t: now, m: fr.midi}); while (buf.length && buf[0].t < now - 600) buf.shift();
       if (buf[buf.length - 1].t - buf[0].t < 550) return;
       const med = buf.map(x => x.m).sort((a, b) => a - b)[buf.length >> 1];
-      if (buf.every(x => Math.abs(x.m - med) < .5)) { msg.textContent = ''; finish(Math.round(med)); }
+      if (buf.every(x => Math.abs(x.m - med) < .5)) { msg.textContent = ''; finish(Math.min(84, Math.max(36, Math.round(med)))); }   // inside the pickers' reach
     });
     to = setTimeout(() => { msg.textContent = 'The book heard no steady note. Hold one note a little longer.'; finish(null); }, 8000);
     onLeave(() => finish(null));
