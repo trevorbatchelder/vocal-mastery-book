@@ -1073,6 +1073,12 @@ function harmonize(piece, kind = 'auto') {
   const fixed = {above3: 2, below3: -2, above6: 5}[kind];
   if (fixed != null) return notes.map(n => n[0] == null ? null : [n[0] + fixed, 0]);   // pins are your changes to Auto; the plain intervals stay plain
   const M = metric(piece), mel = notes.map(n => n[0] == null ? null : degSemis(mode, n[0], n[3] || 0));
+  // 'tenor', the bluegrass part over the lead: the nearest note of the chord's triad above (never its seventh); a passing note, a third above
+  if (kind === 'tenor') return notes.map((n, i) => { if (n[0] == null) return null;
+    const triad = M[i].chord.slice(0, 3);
+    if (triad.includes(pc12(mel[i]))) for (let step = 1; step <= 5; step++) for (const a of [0, 1, -1]) {
+      const x = degSemis(mode, n[0] + step, a); if (x > mel[i] && triad.includes(pc12(x)) && (a === 0 || !S.includes(pc12(x)))) return [n[0] + step, a]; }
+    return [n[0] + 2, 0]; });
   // a degree as a chord tone: as written, or with the chord's own chromatic note (a II7's raised fourth); null if neither
   const asTone = (d, chord) => { if (chord.includes(pc12(degSemis(mode, d)))) return [d, 0];
     for (const a of [1, -1]) { const p = pc12(degSemis(mode, d, a)); if (chord.includes(p) && !S.includes(p)) return [d, a]; } return null; };
@@ -2465,7 +2471,7 @@ function drawSongEditor(v, id) {
    A piece from the shelf (D.pieces: practice lines and songs) with the harmony writer's second part (harm.js), both on the lane:
    your part in rose and graded, the other part faint. The key is picked so your part sits inside your range. Underneath, the old
    Harmony page's teaching as cards: the harmonised scale, the four motions, three voices, safe notes, the method, blend. */
-const TG_KINDS = [['auto', 'Auto'], ['above3', 'A third above'], ['below3', 'A third below'], ['above6', 'A sixth above']];
+const TG_KINDS = [['auto', 'Auto'], ['tenor', 'Tenor'], ['above3', 'A third above'], ['below3', 'A third below'], ['above6', 'A sixth above']];
 const TG_OFF = {above3: 2, below3: -2, above6: 5};           // the harmonised-scale rows as diatonic steps from the melody
 const HALF_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
 const pieceById = id => { const mine = typeof mySongs !== 'undefined' && mySongs.find(s => s.id === id);   // your own songs read as pieces
@@ -2519,7 +2525,7 @@ page('together', {name: 'Sing Together', short: 'Together', icon: 'together', dr
   const shift = key === fit.key ? fit.shift : fitShift(mySemis, key, R).shift;   // a key you chose still gets the octave that fits
   const P = partsOf(piece, st.kind, key, shift), mine = st.you === 'mel' ? P.mel : P.harm, other = st.you === 'mel' ? P.harm : P.mel;
   const kindName = TG_KINDS.find(k => k[0] === st.kind)[1].toLowerCase();
-  const partName = st.you === 'mel' ? 'the melody' : st.kind === 'auto' ? 'the harmony' : kindName;
+  const partName = st.you === 'mel' ? 'the melody' : st.kind === 'auto' ? 'the harmony' : st.kind === 'tenor' ? 'the tenor, the high part of a bluegrass duet: the nearest chord note above the melody' : kindName;
   const where = `${key} ${mode}`;
 
   v.append(h('h1', {class: 'ph'}, 'Sing Together'),
